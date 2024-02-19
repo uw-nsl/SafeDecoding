@@ -64,7 +64,7 @@ python defense.py --model_name [YOUR_MODEL_NAME] --attacker [YOUR_ATTACKER_NAME]
 
 Current Support:
 
-- **Model Name**: vicuna, llama2-chat, guanaco, falcon and dolphin.
+- **Model Name**: vicuna, llama2, guanaco, falcon and dolphin.
 
 - **Attacker**: GCG, AutoDAN, PAIR, DeepInception, AdvBench and your customized dataset.
 
