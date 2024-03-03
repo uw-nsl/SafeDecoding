@@ -347,11 +347,6 @@ for prompt in tqdm(attack_prompts):
         else:
             raise ValueError("Invalid defender name.")
     
-        if args.verbose:
-            logging.info("-------------------")
-            logging.info(f"Full input: {tokenizer.decode(inputs['input_ids'][0])}")
-            logging.info("-------------------")
-    
     else:
         input_manager = PromptManager(tokenizer=tokenizer, 
             conv_template=conv_template, 

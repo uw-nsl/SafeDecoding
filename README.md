@@ -10,12 +10,12 @@ As large language models (LLMs) become increasingly integrated into real-world a
 
 ## Overview
 
-![Overview](figs/overview 720p.gif)
+![Overview](figs/overview.png)
 
 ## Attack Datasets 🤗
 
 ### GCG, AutoDAN, PAIR, and DeepInception
-This [Huggingface dataset](https://huggingface.co/datasets/flydust/SafeDecoding-Attackers) contains attack prompts we generated from GCG, AutoDAN, PAIR, and DeepInception. Note this dataset is for **research use ONLY**.
+This 🤗[Huggingface dataset](https://huggingface.co/datasets/flydust/SafeDecoding-Attackers) contains attack prompts we generated from GCG, AutoDAN, PAIR, and DeepInception. Note this dataset is for **research use ONLY**.
 ### SAP30, GPTFuzzer, and HEx-PHI
 Please refer to the author's repo for [SAP30](https://github.com/Aatrox103/SAP), [GPTFuzzer](https://github.com/sherdencooper/GPTFuzz), and [HEx-PHI](https://huggingface.co/datasets/LLM-Tuning-Safety/HEx-PHI) dataset. 
 ### Customize your own dataset! 🫨
@@ -82,6 +82,8 @@ We integrated **Just-Eval** in ```defense.py```. To evaulate,
 cd exp
 python defense.py --model_name [YOUR_MODEL_NAME] --attacker Just-Eval --defender [YOUR_DEFENDER_NAME] --GPT_API [YOUR_OPENAI_API]
 ```
+
+Please refer to [mt_bench/README.md](https://github.com/uw-nsl/SafeDecoding/tree/main/mt_bench) for detailed MT_Bench setups (not integrated to ```defense.py``` yet as it contains multi-round conversations).
 
 ## [Optional] Customize Your Own Experts! 🫨
 
