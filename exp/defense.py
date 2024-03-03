@@ -41,7 +41,7 @@ def get_args():
 
     # System Settings
     parser.add_argument("--device", type=str, default="0")
-    parser.add_argument("--verbose", type=bool, default=True)
+    parser.add_argument("--verbose", type=bool, default=False)
     parser.add_argument("--verbose_on", action="store_true", dest="verbose", help="Enable verbose")
     parser.add_argument("--FP16", type=bool, default=True)
     parser.add_argument("--low_cpu_mem_usage", type=bool, default=True)
@@ -58,9 +58,12 @@ def get_args():
 args = get_args()
 
 # API Key
-if args.GPT_API is None and args.disable_GPT_judge is False:
-    raise ValueError("GPT_API is required for GPT judge. If you want to disable GPT judge, please use --disable_GPT_judge.")
-
+if args.attacker == "Just-Eval":
+    if args.GPT_API is None:
+        raise ValueError("GPT_API is required for Just-Eval.")
+else:
+    if args.GPT_API is None and args.disable_GPT_judge is False:
+        raise ValueError("GPT_API is required for GPT judge. If you want to disable GPT judge, please use --disable_GPT_judge.")
 
 # Set the random seed for NumPy
 np.random.seed(args.seed)
@@ -144,6 +147,8 @@ elif args.attacker == "DeepInception":
 elif args.attacker == "custom":
     with open('/SafeDecoding/datasets/custom_prompts.json', 'r', encoding='utf-8') as file:
         attack_prompts = json.load(file)
+elif args.attacker == "Just-Eval":
+    attack_prompts = load_dataset('re-align/just-eval-instruct', split="test")
 else:
     raise ValueError("Invalid attacker name.")
 
@@ -188,35 +193,38 @@ safe_decoder = SafeDecoding(model,
 
 # Initialize output json
 output_json = {}
-output_json['experiment_variables'] = {
-    "model_name": args.model_name,
-    "model_path": model_name,
-    "attacker": args.attacker,
-    "defender": args.defender,
-    "whitebox_attacker": whitebox_attacker,
-    "is_defense": args.is_defense,
-    "eval_mode": args.eval_mode,
-    "alpha": args.alpha,
-    "first_m": args.first_m,
-    "top_k": args.top_k,
-    "num_common_tokens": args.num_common_tokens,
-    "max_new_tokens": args.max_new_tokens,
-    "ppl_threshold": args.ppl_threshold,
-    "BPO_dropout_rate": args.BPO_dropout_rate,
-    "paraphase_model": args.paraphase_model,
-    "verbose": args.verbose,
-    "device": args.device,
-    "FP16": args.FP16,
-    "low_cpu_mem_usage": args.low_cpu_mem_usage,
-    "use_cache": args.use_cache,
-    "do_sample": args.do_sample,
-    "seed": args.seed,
-    "multi_processing": args.multi_processing,
-    "generation_config": str(model.generation_config),
-    "commit_hash": commit_hash,
-    "commit_date": commit_date,
-}
-output_json['data'] = []
+if args.attacker != "Just-Eval":
+    output_json['experiment_variables'] = {
+        "model_name": args.model_name,
+        "model_path": model_name,
+        "attacker": args.attacker,
+        "defender": args.defender,
+        "whitebox_attacker": whitebox_attacker,
+        "is_defense": args.is_defense,
+        "eval_mode": args.eval_mode,
+        "alpha": args.alpha,
+        "first_m": args.first_m,
+        "top_k": args.top_k,
+        "num_common_tokens": args.num_common_tokens,
+        "max_new_tokens": args.max_new_tokens,
+        "ppl_threshold": args.ppl_threshold,
+        "BPO_dropout_rate": args.BPO_dropout_rate,
+        "paraphase_model": args.paraphase_model,
+        "verbose": args.verbose,
+        "device": args.device,
+        "FP16": args.FP16,
+        "low_cpu_mem_usage": args.low_cpu_mem_usage,
+        "use_cache": args.use_cache,
+        "do_sample": args.do_sample,
+        "seed": args.seed,
+        "multi_processing": args.multi_processing,
+        "generation_config": str(model.generation_config),
+        "commit_hash": commit_hash,
+        "commit_date": commit_date,
+    }
+    output_json['data'] = []
+else:
+    output_json = []
 
 
 # Start generation
@@ -224,6 +232,8 @@ for prompt in tqdm(attack_prompts):
     logging.info("--------------------------------------------")
     if args.attacker == "naive":
         user_prompt = prompt["goal"]
+    elif args.attacker == "Just-Eval":
+        user_prompt = prompt["instruction"]
     else:
         user_prompt = prompt["prompt"]
 
@@ -352,15 +362,27 @@ for prompt in tqdm(attack_prompts):
     time_end = time.time()
 
     # Save outputs
-    output_formatted = {
-        "id": prompt["id"],
-        "goal": prompt["goal"],
-        "instruction": user_prompt,
-        "output": outputs,
-        "generator": args.model_name+f'_{args.attacker}_{args.defender if args.is_defense else "nodefense"}',
-        "time_cost": time_end-time_start,
-        "output_length": output_length,
+    if args.attacker == "Just-Eval":
+        output_formatted = {
+            "id": prompt["id"],
+            "instruction": user_prompt,
+            "source_id": prompt['source_id'],
+            "dataset": prompt['dataset'],
+            "output": outputs,
+            "generator": args.model_name+f'_{args.attacker}_{args.defender if args.is_defense else "nodefense"}',
+            "time_cost": time_end-time_start,
+            "datasplit": "just_eval"
         }
+    else:
+        output_formatted = {
+            "id": prompt["id"],
+            "goal": prompt["goal"],
+            "instruction": user_prompt,
+            "output": outputs,
+            "generator": args.model_name+f'_{args.attacker}_{args.defender if args.is_defense else "nodefense"}',
+            "time_cost": time_end-time_start,
+            "output_length": output_length,
+            }
 
     # Complementary info
     if args.defender == 'PPL':
@@ -370,7 +392,10 @@ for prompt in tqdm(attack_prompts):
     if args.defender == 'paraphrase':
         output_formatted['paraphrased_prompt'] = outputs_paraphrase
 
-    output_json['data'].append(output_formatted)
+    if args.attacker != "Just-Eval":
+        output_json['data'].append(output_formatted)
+    else:
+        output_json.append(output_formatted)
 
 save_name = f'{args.defender if args.is_defense else "nodefense"}_{args.model_name}_{args.attacker}_{args.num_prompts}_{time_str}'
 with open(folder_path+'/'+save_name+'.json', 'w') as f:
@@ -382,48 +407,70 @@ logging.info(f"Results saved to {save_name}.")
 if args.eval_mode:
     logging.info("Evaluating...")
 
-    results = output_json['data']
-    goals = [result['goal'] for result in results]
-    instructions = [result['instruction'] for result in results]
-    responses = [result['output'] for result in results]
+    if args.attacker != "Just-Eval":
+        results = output_json['data']
+        goals = [result['goal'] for result in results]
+        instructions = [result['instruction'] for result in results]
+        responses = [result['output'] for result in results]
 
-    if not args.disable_GPT_judge:
-        gpt_judge = GPTJudge('gpt',mp=args.multi_processing, api=args.GPT_API)
-        goals_responses_pairs = []
+        if not args.disable_GPT_judge:
+            gpt_judge = GPTJudge('gpt',mp=args.multi_processing, api=args.GPT_API)
+            goals_responses_pairs = []
+            for i in range(len(instructions)):
+                goals_responses_pairs.append((goals[i], responses[i]))
+
+            scores, reasons = gpt_judge.evaluate(goals_responses_pairs)
+            scores_gpt = gpt_judge.score_parse(scores)
+
+        dict_judge = DictJudge()
+        scores_dict = dict_judge.eval_batch(responses)
+
+        safe_eval_results = []
+
         for i in range(len(instructions)):
-            goals_responses_pairs.append((goals[i], responses[i]))
+            output_formatted = {
+                "id": i,
+                "goal": goals[i],
+                "instruction": instructions[i],
+                "output": responses[i],
+                "dic_score": scores_dict[i],
+                "GPT_score": scores_gpt[i] if not args.disable_GPT_judge else None,
+                "GPT_reason": reasons[i] if not args.disable_GPT_judge else None
+            }
+            safe_eval_results.append(output_formatted)
 
-        scores, reasons = gpt_judge.evaluate(goals_responses_pairs)
-        scores_gpt = gpt_judge.score_parse(scores)
+        with open(folder_path+'/'+save_name+'_safe_eval.json', 'w') as f:
+            json.dump(safe_eval_results, f, indent=4)
+        logging.info(f"Evaluation results saved to {save_name+'_safe_eval'}.")
 
-    dict_judge = DictJudge()
-    scores_dict = dict_judge.eval_batch(responses)
+        gpt_score_sum = 0
+        defense_success_count = 0
+        for i in range(len(safe_eval_results)):
+            if safe_eval_results[i]['GPT_score'] != None:
+                gpt_score_sum += safe_eval_results[i]['GPT_score']
+            if safe_eval_results[i]['dic_score'] == 1:
+                defense_success_count += 1
 
-    safe_eval_results = []
+        logging.info(f'Harmful Score: {gpt_score_sum / len(safe_eval_results)}')
+        logging.info(f'ASR: {100-(defense_success_count / len(safe_eval_results))*100:.2f}%')
 
-    for i in range(len(instructions)):
-        output_formatted = {
-            "id": i,
-            "goal": goals[i],
-            "instruction": instructions[i],
-            "output": responses[i],
-            "dic_score": scores_dict[i],
-            "GPT_score": scores_gpt[i] if not args.disable_GPT_judge else None,
-            "GPT_reason": reasons[i] if not args.disable_GPT_judge else None
-        }
-        safe_eval_results.append(output_formatted)
+    else:
+        # Just-Eval run
+        just_eval_run_command = f'''
+        just_eval \
+            --mode "score_multi" \
+            --model "gpt-4-0314" \
+            --first_file "{folder_path+'/'+save_name+'.json'}" \
+            --output_file "{folder_path+'/'+save_name+'_safe_eval.json'}" \
+            --api_key "{args.GPT_API}"
+        '''
+        just_eval_run_output = subprocess.check_output(just_eval_run_command, shell=True, text=True)
+        logging.info(f"Just-Eval output: {just_eval_run_output}")
 
-    with open(folder_path+'/'+save_name+'_safe_eval.json', 'w') as f:
-        json.dump(safe_eval_results, f, indent=4)
-    logging.info(f"Evaluation results saved to {save_name+'_safe_eval'}.")
-
-    gpt_score_sum = 0
-    defense_success_count = 0
-    for i in range(len(safe_eval_results)):
-        if safe_eval_results[i]['GPT_score'] != None:
-            gpt_score_sum += safe_eval_results[i]['GPT_score']
-        if safe_eval_results[i]['dic_score'] == 1:
-            defense_success_count += 1
-
-    logging.info(f'Harmful Score: {gpt_score_sum / len(safe_eval_results)}')
-    logging.info(f'ASR: {100-(defense_success_count / len(safe_eval_results))*100:.2f}%')
+        # Just-Eval stats
+        just_eval_stats_command = f'''
+        just_eval --report_only --mode "score_safety" \
+                --output_file "{folder_path+'/'+save_name+'_safe_eval.json'}"
+        '''
+        just_eval_stats_output = subprocess.check_output(just_eval_stats_command, shell=True, text=True)
+        logging.info(f"Just-Eval stats output: {just_eval_stats_output}")

@@ -10,7 +10,7 @@ As large language models (LLMs) become increasingly integrated into real-world a
 
 ## Overview
 
-![Overview](figs/overview.png)
+![Overview](figs/overview 720p.gif)
 
 ## Attack Datasets 🤗
 
@@ -54,7 +54,7 @@ pip install -r requirements.txt
 ```
 
 ## Inference-time Defense Evaluation
-We provide easy-to-use implementation **SafeDecoding** and other six baseline defenses, i.e., **PPL**, **Self-Examination**, **Paraphrase**, **Retokenization**, **Self-Reminder** and **ICD** in ```defense.py```. You can use our code to evaluate your attack performance under different defense mechanisms 👀. Please refer to our [paper](https://arxiv.org/abs/2402.08983) for detailed parameter setup.
+We provide easy-to-use implementation **SafeDecoding** and other six baseline defenses, i.e., **PPL**, **Self-Examination**, **Paraphrase**, **Retokenization**, **Self-Reminder** and **ICD** in ```defense.py```. You can use our code to evaluate your attack performance under different defense mechanisms 👀. Please refer to our [paper](https://arxiv.org/abs/2402.08983) for detailed parameter setups.
 
 To start,
 ```
@@ -62,7 +62,7 @@ cd exp
 python defense.py --model_name [YOUR_MODEL_NAME] --attacker [YOUR_ATTACKER_NAME] --defender [YOUR_DEFENDER_NAME] --GPT_API [YOUR_OPENAI_API]
 ```
 
-Current Support:
+Current Supports:
 
 - **Model Name**: vicuna, llama2, guanaco, falcon and dolphin.
 
@@ -70,25 +70,31 @@ Current Support:
 
 - **Defender**: SafeDecoding, PPL, Self-Exam, Paraphrase, Retokenization, Self-Reminder, ICD.
 
-Don't forget to **add your openai api** to get *harmful score*. If you only want to get *ASR*, you can
+Don't forget to **add your openai api** to get *harmful scores*. If you only want to get *ASR*, you can
 
 ```
 python defense.py --model_name [YOUR_MODEL_NAME] --attacker [YOUR_ATTACKER_NAME] --defender [YOUR_DEFENDER_NAME] --disable_GPT_judge
 ```
 
+## Utility Evaluation
+We integrated **Just-Eval** in ```defense.py```. To evaulate, 
+```
+cd exp
+python defense.py --model_name [YOUR_MODEL_NAME] --attacker Just-Eval --defender [YOUR_DEFENDER_NAME] --GPT_API [YOUR_OPENAI_API]
+```
 
 ## [Optional] Customize Your Own Experts! 🫨
 
-We provide some out-of-the-box expert models for vicuna, llama2-chat, guanaco, falcon and dolphin in ```lora_modules```. These experts may not be strong enough, and you can of course train your more powerful expert models. To do so, you can
+We provide some out-of-the-box expert models for vicuna, llama2, guanaco, falcon and dolphin in ```lora_modules```. These experts may not be strong enough, and you can of course train your more powerful expert models. To do so, you can
 ```
 cd exp
 python finetune.py --model_name [YOUR_MODEL_NAME] --GPT_API [YOUR_OPENAI_API]
 ```
-In this case, you will need to collect your own dataset and fine-tune the original model.
+In this case, you will need to collect your own datasets and fine-tune the original model.
 
 ## Acknowledgements
 
-Some codes are build upon [PEFT](https://github.com/huggingface/peft), [llm-attack](https://github.com/llm-attacks/llm-attacks), [BPE-Dropout](https://github.com/VProv/BPE-Dropout/), and [lmppl](https://github.com/asahi417/lmppl/).
+Some codes are build upon [PEFT](https://github.com/huggingface/peft), [llm-attacks](https://github.com/llm-attacks/llm-attacks), [BPE-Dropout](https://github.com/VProv/BPE-Dropout/), and [lmppl](https://github.com/asahi417/lmppl/).
 
 ## Citation
 ```
