@@ -1,6 +1,7 @@
 # 🛡️ SafeDecoding
 
 This is the official repository for "[SafeDecoding: Defending against Jailbreak Attacks via Safety-Aware Decoding](https://arxiv.org/abs/2402.08983).
+$\textcolor{red}{\text{WARNING: This paper contains model outputs that may be considered offensive.}}$
 
 [![arXiv](https://img.shields.io/badge/arXiv-paper-b31b1b.svg)](https://arxiv.org/abs/2402.08983) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
