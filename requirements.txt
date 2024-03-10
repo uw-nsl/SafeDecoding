@@ -10,5 +10,5 @@ datasets
 accelerate
 matplotlib
 sentencepiece
-/llm-defense/peft
-/llm-defense/just_eval
+/SafeDecoding/peft
+/SafeDecoding/just_eval
