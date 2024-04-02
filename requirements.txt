@@ -1,4 +1,5 @@
 transformers==4.28.1
+trl==0.7.4
 ml_collections
 fschat==0.2.20
 tenacity==8.2.3
