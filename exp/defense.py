@@ -104,7 +104,7 @@ model, tokenizer = load_model_and_tokenizer(model_name,
                        do_sample=False,
                        device=device)
 
-model = PeftModel.from_pretrained(model, "/SafeDecoding/lora_modules/"+args.model_name, adapter_name="expert")
+model = PeftModel.from_pretrained(model, "../lora_modules/"+args.model_name, adapter_name="expert")
 adapter_names = ['base', 'expert']
 
 
@@ -114,7 +114,7 @@ if args.defender == 'PPL':
     ppl_calculator = PPL_Calculator(model = 'gpt2')
 # Load BPE Dropout
 elif args.defender == 'Retokenization':
-    merge_table_path = '/SafeDecoding/utils/subword_nmt.voc'
+    merge_table_path = '../utils/subword_nmt.voc'
     merge_table = load_subword_nmt_table(merge_table_path)
     subword_nmt_tokenizer = BpeOnlineTokenizer(
             bpe_dropout_rate = args.BPO_dropout_rate,
@@ -127,7 +127,7 @@ elif args.defender == 'Self-Reminder':
 
 # Load attack prompts
 if args.attacker == "AdvBench":
-    with open('/SafeDecoding/datasets/harmful_behaviors_custom.json', 'r', encoding='utf-8') as file:
+    with open('../datasets/harmful_behaviors_custom.json', 'r', encoding='utf-8') as file:
         attack_prompts = json.load(file)
 elif args.attacker in ["GCG", "AutoDAN", "PAIR"]:
     attack_prompts = load_dataset('flydust/SafeDecoding-Attackers', split="train")
@@ -145,7 +145,7 @@ elif args.attacker == "DeepInception":
     attack_prompts = load_dataset('flydust/SafeDecoding-Attackers', split="train")
     attack_prompts = attack_prompts.filter(lambda x: x['source'] == args.attacker)
 elif args.attacker == "custom":
-    with open('/SafeDecoding/datasets/custom_prompts.json', 'r', encoding='utf-8') as file:
+    with open('../datasets/custom_prompts.json', 'r', encoding='utf-8') as file:
         attack_prompts = json.load(file)
 elif args.attacker == "Just-Eval":
     attack_prompts = load_dataset('re-align/just-eval-instruct', split="test")
@@ -163,7 +163,7 @@ whitebox_attacker = True if args.attacker in ["GCG", "AutoDAN"] else False
 # Logging
 current_time = time.localtime()
 time_str = str(time.strftime("%Y-%m-%d %H:%M:%S", current_time))
-folder_path = "/SafeDecoding/exp_outputs/"+f'{args.defender if args.is_defense else "nodefense"}_{args.model_name}_{args.attacker}_{args.num_prompts}_{time_str}'
+folder_path = "../exp_outputs/"+f'{args.defender if args.is_defense else "nodefense"}_{args.model_name}_{args.attacker}_{args.num_prompts}_{time_str}'
 if not os.path.exists(folder_path):
     os.makedirs(folder_path)
 log_name = f'{args.defender if args.is_defense else "nodefense"}_{args.model_name}_{args.attacker}_{time_str}.log'

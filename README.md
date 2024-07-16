@@ -42,7 +42,6 @@ then enter your Huggingface private key beginning with "hf_".
 
 **Get Code**
 ```
-cd /
 git clone https://github.com/uw-nsl/SafeDecoding.git
 ```
 **Build Environment**

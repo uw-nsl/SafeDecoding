@@ -96,7 +96,7 @@ else:
     raise ValueError("Invalid model name.")
 
 # Logging Settings
-output_dir = "/SafeDecoding/lora_modules/" + args.model_name
+output_dir = "../lora_modules/" + args.model_name
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
@@ -148,7 +148,7 @@ ft_datasets = []
 save_path = output_dir + "/ft_datasets_"+args.model_name+".json"
 
 # Load naive harmful prompts
-with open('/SafeDecoding/datasets/seed_reject.json', 'r', encoding='utf-8') as file:
+with open('../datasets/seed_reject.json', 'r', encoding='utf-8') as file:
     seed_reject = json.load(file)
 
 attack_prompts = [prompt["prompt"] for prompt in seed_reject["prompts"]]
