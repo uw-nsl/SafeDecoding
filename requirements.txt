@@ -1,7 +1,6 @@
-transformers==4.28.1
+transformers==4.42.4
 trl==0.7.4
 ml_collections
-fschat==0.2.20
 tenacity==8.2.3
 boto3==1.34.23
 openai==1.9.0
@@ -11,5 +10,7 @@ datasets
 accelerate
 matplotlib
 sentencepiece
--e ./peft
--e ./just_eval
+# fschat==0.2.20
+./pkgs/FastChat
+-e ./pkgs/just_eval
+-e ./pkgs/peft
