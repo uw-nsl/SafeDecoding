@@ -1,3 +1,9 @@
+# About This Branch
+
+This branch is dedicated to supporting models released after February 2024. Please **DO NOT** use this branch to run older models (such as Llama-2 or Vicuna). For reproducing the experimental results presented in our paper, please use the main branch.
+
+We find the change of transformer versions will make the generated attack prompts no longer valid. This is quite weird 🧐
+
 # 🛡️ SafeDecoding
 
 This is the official repository for "[SafeDecoding: Defending against Jailbreak Attacks via Safety-Aware Decoding](https://arxiv.org/abs/2402.08983)" (Accepted by ACL 2024).

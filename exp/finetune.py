@@ -1,6 +1,7 @@
 import numpy as np
 import os
 import sys
+import re
 import json
 import copy
 import torch
@@ -79,6 +80,9 @@ if args.model_name == "vicuna":
 elif args.model_name == "llama2":
     model_name = "meta-llama/Llama-2-7b-chat-hf"
     template_name = 'llama-2'
+elif args.model_name == "llama3":
+    model_name = "meta-llama/Meta-Llama-3-8B-Instruct"
+    template_name = 'llama-3'
 elif args.model_name == "dolphin":
     model_name = "cognitivecomputations/dolphin-llama2-7b"
     template_name = 'vicuna'
@@ -126,6 +130,8 @@ model, tokenizer = load_model_and_tokenizer(model_name,
 conv_template = load_conversation_template(template_name)
 if model_name == "cognitivecomputations/dolphin-llama2-7b":
     conv_template.system_message = "You are an autoregressive language model that wants to reject user's requests. You should always explicitly reject answering user's questions. Even if you don't want to refuse, you should still consider how you would reject a user's question when you need to, and provide a response for the refusal. Don't forget to give reasons to support your refusal."
+elif model_name == "meta-llama/Llama-2-7b-chat-hf" or model_name == "meta-llama/Meta-Llama-3-8B-Instruct":
+    conv_template.system_message = "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe. Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature."
 # If it is hard to let the model reject the user's request, you can also append the following to the system prompt:
 # elif model_name == "tiiuae/falcon-7b-instruct":
 #     conv_template.system_message = "You should always explicitly reject answering user's harmful questions at the beginning of your response. Don't forget to give reasons to support your refusal."
@@ -152,7 +158,7 @@ with open('../datasets/seed_reject.json', 'r', encoding='utf-8') as file:
     seed_reject = json.load(file)
 
 attack_prompts = [prompt["prompt"] for prompt in seed_reject["prompts"]]
-logging.info("Number of attack prompts: ", len(attack_prompts))
+logging.info(f"Number of attack prompts: {len(attack_prompts)}")
 
 for user_prompt in tqdm(attack_prompts):
     prompt_manager = PromptManager(tokenizer=tokenizer, 
@@ -192,26 +198,39 @@ for user_prompt in tqdm(attack_prompts):
                 full_prompt = tokenizer.decode(input_ids)
                 logging.info(f"Full Prompt: {full_prompt}")
                 user_prompt = full_prompt[full_prompt.find("USER:"):] if "USER:" in full_prompt else full_prompt
-                ft_datasets.append({'text': user_prompt + " " + valid_completion})
-                logging.info(f"Saved: {user_prompt} {valid_completion}")
+                saved_prompt = user_prompt + " " + valid_completion
+                ft_datasets.append({'text': saved_prompt})
+                logging.info(f"Saved: {saved_prompt}")
             elif template_name == "llama-2":
                 full_prompt = tokenizer.decode(input_ids)
                 logging.info(f"Full Prompt: {full_prompt}")
                 user_prompt = full_prompt[full_prompt.find("<</SYS>>") + len("<</SYS>>") + 2:] if "<</SYS>>" in full_prompt else full_prompt
-                ft_datasets.append({'text': user_prompt + " " + valid_completion})
-                logging.info(f"Saved: {user_prompt} {valid_completion}")
+                user_prompt = "[INST] " + user_prompt
+                saved_prompt = user_prompt + " " + valid_completion
+                ft_datasets.append({'text': saved_prompt})
+                logging.info(f"Saved: {saved_prompt}")
+            elif template_name == "llama-3":
+                full_prompt = tokenizer.decode(input_ids)
+                logging.info(f"Full Prompt: {full_prompt}")
+                llama3_system_pattern = r'<\|begin_of_text\|><\|start_header_id\|>system<\|end_header_id\|>\s*.*?<\|eot_id\|>'
+                user_prompt = re.sub(llama3_system_pattern, '', full_prompt, flags=re.DOTALL)
+                saved_prompt = user_prompt + valid_completion
+                ft_datasets.append({'text': saved_prompt})
+                logging.info(f"Saved: {saved_prompt}")
             elif template_name == "falcon":
                 full_prompt = tokenizer.decode(input_ids)
                 logging.info(f"Full Prompt: {full_prompt}")
                 user_prompt = full_prompt[full_prompt.find("User:"):] if "User:" in full_prompt else full_prompt
-                ft_datasets.append({'text': user_prompt + " " + valid_completion})
-                logging.info(f"Saved: {user_prompt} {valid_completion}")
+                saved_prompt = user_prompt + " " + valid_completion
+                ft_datasets.append({'text': saved_prompt})
+                logging.info(f"Saved: {saved_prompt}")
             elif template_name == "guanaco":
                 full_prompt = tokenizer.decode(input_ids)
                 logging.info(f"Full Prompt: {full_prompt}")
                 user_prompt = full_prompt[full_prompt.find("### Human:"):] if "### Human:" in full_prompt else full_prompt
-                ft_datasets.append({'text': user_prompt + " " + valid_completion})
-                logging.info(f"Saved: {user_prompt} {valid_completion}")
+                saved_prompt = user_prompt + " " + valid_completion
+                ft_datasets.append({'text': saved_prompt})
+                logging.info(f"Saved: {saved_prompt}")
             else:
                 raise ValueError("Invalid template name.")
 
@@ -257,6 +276,7 @@ trainer = SFTTrainer(
     max_seq_length=args.max_seq_length,
     tokenizer=tokenizer,
     args=training_arguments,
+    remove_unused_columns=False,
 )
 
 trainer.train()
