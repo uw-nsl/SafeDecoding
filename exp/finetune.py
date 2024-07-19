@@ -23,7 +23,7 @@ from utils.model import GPT
 def get_args():
     parser = argparse.ArgumentParser(description="Finetune manager.")
     # Experiment Settings
-    parser.add_argument("--model_name", type=str, default="vicuna")
+    parser.add_argument("--model_name", type=str, default="llama3")
 
     # Finetune (Generation) Parameters
     parser.add_argument("--top_p", type=int, default=0.9)
@@ -40,7 +40,7 @@ def get_args():
     parser.add_argument("--bias", type=str, default="none")
     parser.add_argument("--optim", type=str, default="adamw_torch")
     parser.add_argument("--per_device_train_batch_size", type=int, default=1)
-    parser.add_argument("--gradient_accumulation_steps", type=int, default=1)
+    parser.add_argument("--gradient_accumulation_steps", type=int, default=2)
     parser.add_argument("--num_train_epochs", type=int, default=2)
     parser.add_argument("--logging_steps", type=int, default=10)
     parser.add_argument("--learning_rate", type=float, default=2e-3)
@@ -52,7 +52,7 @@ def get_args():
     # System Settings
     parser.add_argument("--device", type=str, default="0")
     parser.add_argument("--verbose", type=bool, default=False)
-    parser.add_argument("--FP16", type=bool, default=True)
+    parser.add_argument("--BF16", type=bool, default=True)
     parser.add_argument("--low_cpu_mem_usage", type=bool, default=True)
     parser.add_argument("--use_cache", type=bool, default=False)
     parser.add_argument("--seed", type=int, default=0)
@@ -74,30 +74,11 @@ torch.manual_seed(args.seed)
 torch.cuda.manual_seed_all(args.seed)
 
 # Load model and template
-if args.model_name == "vicuna":
-    model_name = "lmsys/vicuna-7b-v1.5"
-    template_name = 'vicuna'
-elif args.model_name == "llama2":
-    model_name = "meta-llama/Llama-2-7b-chat-hf"
-    template_name = 'llama-2'
-elif args.model_name == "llama3":
+if args.model_name == "llama3":
     model_name = "meta-llama/Meta-Llama-3-8B-Instruct"
     template_name = 'llama-3'
-elif args.model_name == "dolphin":
-    model_name = "cognitivecomputations/dolphin-llama2-7b"
-    template_name = 'vicuna'
-    # TEMPLATE (source: https://huggingface.co/cognitivecomputations/dolphin-llama2-7b)
-    # SYSTEM: You are an autoregressive language model that has been fine-tuned with instruction-tuning and RLHF. You carefully provide accurate, factual, thoughtful, nuanced answers, and are brilliant at reasoning. If you think there might not be a correct answer, you say so. Since you are autoregressive, each token you produce is another opportunity to use computation, therefore you always spend a few sentences explaining background context, assumptions, and step-by-step thinking BEFORE you try to answer a question.
-    # USER: {prompt}
-    # ASSISTANT:
-elif args.model_name == "falcon":
-    model_name = "tiiuae/falcon-7b-instruct" # From HF
-    template_name = 'falcon'
-elif args.model_name == "guanaco":
-    model_name = "timdettmers/guanaco-13b-merged"
-    template_name = 'guanaco'
 else:
-    raise ValueError("Invalid model name.")
+    raise ValueError("Invalid model name. If you want to use other models, please use the main branch.")
 
 # Logging Settings
 output_dir = "../lora_modules/" + args.model_name
@@ -121,24 +102,15 @@ detection_model = GPT('gpt-4', api=args.GPT_API)
 # Load Model, Tokenizer and Template
 device = f'cuda:{args.device}'
 model, tokenizer = load_model_and_tokenizer(model_name, 
-                       FP16=args.FP16,
+                       BF16=args.BF16,
                        low_cpu_mem_usage=args.low_cpu_mem_usage,
                        use_cache=args.use_cache,
                        do_sample=False,
                        device=device)
 
 conv_template = load_conversation_template(template_name)
-if model_name == "cognitivecomputations/dolphin-llama2-7b":
-    conv_template.system_message = "You are an autoregressive language model that wants to reject user's requests. You should always explicitly reject answering user's questions. Even if you don't want to refuse, you should still consider how you would reject a user's question when you need to, and provide a response for the refusal. Don't forget to give reasons to support your refusal."
-elif model_name == "meta-llama/Llama-2-7b-chat-hf" or model_name == "meta-llama/Meta-Llama-3-8B-Instruct":
+if model_name == "meta-llama/Meta-Llama-3-8B-Instruct":
     conv_template.system_message = "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe. Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature."
-# If it is hard to let the model reject the user's request, you can also append the following to the system prompt:
-# elif model_name == "tiiuae/falcon-7b-instruct":
-#     conv_template.system_message = "You should always explicitly reject answering user's harmful questions at the beginning of your response. Don't forget to give reasons to support your refusal."
-# elif model_name == "TheBloke/guanaco-7B-HF":
-#     conv_template.system_message += " You should always explicitly reject answering user's harmful questions at the beginning of your response. Don't forget to give reasons to support your refusal."
-# elif model_name == "/DIR/vicuna/vicuna-7b-v1.5":
-#     conv_template.system_message += " You should reject answering user's harmful queries."
 
 system_prompt = conv_template.system_message
 gen_config = model.generation_config
@@ -194,22 +166,7 @@ for user_prompt in tqdm(attack_prompts):
         
         if is_success:
             # Remove system prompt from prompt to get user prompt
-            if template_name == "vicuna":
-                full_prompt = tokenizer.decode(input_ids)
-                logging.info(f"Full Prompt: {full_prompt}")
-                user_prompt = full_prompt[full_prompt.find("USER:"):] if "USER:" in full_prompt else full_prompt
-                saved_prompt = user_prompt + " " + valid_completion
-                ft_datasets.append({'text': saved_prompt})
-                logging.info(f"Saved: {saved_prompt}")
-            elif template_name == "llama-2":
-                full_prompt = tokenizer.decode(input_ids)
-                logging.info(f"Full Prompt: {full_prompt}")
-                user_prompt = full_prompt[full_prompt.find("<</SYS>>") + len("<</SYS>>") + 2:] if "<</SYS>>" in full_prompt else full_prompt
-                user_prompt = "[INST] " + user_prompt
-                saved_prompt = user_prompt + " " + valid_completion
-                ft_datasets.append({'text': saved_prompt})
-                logging.info(f"Saved: {saved_prompt}")
-            elif template_name == "llama-3":
+            if template_name == "llama-3":
                 full_prompt = tokenizer.decode(input_ids)
                 logging.info(f"Full Prompt: {full_prompt}")
                 llama3_system_pattern = r'<\|begin_of_text\|><\|start_header_id\|>system<\|end_header_id\|>\s*.*?<\|eot_id\|>'
@@ -217,22 +174,8 @@ for user_prompt in tqdm(attack_prompts):
                 saved_prompt = user_prompt + valid_completion
                 ft_datasets.append({'text': saved_prompt})
                 logging.info(f"Saved: {saved_prompt}")
-            elif template_name == "falcon":
-                full_prompt = tokenizer.decode(input_ids)
-                logging.info(f"Full Prompt: {full_prompt}")
-                user_prompt = full_prompt[full_prompt.find("User:"):] if "User:" in full_prompt else full_prompt
-                saved_prompt = user_prompt + " " + valid_completion
-                ft_datasets.append({'text': saved_prompt})
-                logging.info(f"Saved: {saved_prompt}")
-            elif template_name == "guanaco":
-                full_prompt = tokenizer.decode(input_ids)
-                logging.info(f"Full Prompt: {full_prompt}")
-                user_prompt = full_prompt[full_prompt.find("### Human:"):] if "### Human:" in full_prompt else full_prompt
-                saved_prompt = user_prompt + " " + valid_completion
-                ft_datasets.append({'text': saved_prompt})
-                logging.info(f"Saved: {saved_prompt}")
             else:
-                raise ValueError("Invalid template name.")
+                raise ValueError("Invalid template name. If you want to use other models, please use the main branch.")
 
 with open(save_path, 'w', encoding='utf-8') as f:
     json.dump(ft_datasets, f, ensure_ascii=False, indent=4)
@@ -276,7 +219,6 @@ trainer = SFTTrainer(
     max_seq_length=args.max_seq_length,
     tokenizer=tokenizer,
     args=training_arguments,
-    remove_unused_columns=False,
 )
 
 trainer.train()

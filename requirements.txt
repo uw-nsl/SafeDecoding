@@ -1,5 +1,6 @@
 transformers==4.42.4
-trl==0.8.4
+peft==0.11.1
+trl==0.9.4
 ml_collections
 tenacity==8.2.3
 boto3==1.34.23
@@ -13,4 +14,3 @@ sentencepiece
 # fschat==0.2.20
 ./pkgs/FastChat
 -e ./pkgs/just_eval
--e ./pkgs/peft

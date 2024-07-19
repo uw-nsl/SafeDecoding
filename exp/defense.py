@@ -21,8 +21,8 @@ from peft import PeftModel, PeftModelForCausalLM
 def get_args():
     parser = argparse.ArgumentParser(description="Defense manager.")
     # Experiment Settings
-    parser.add_argument("--model_name", type=str, default="vicuna")
-    parser.add_argument("--attacker", type=str, default="GCG")
+    parser.add_argument("--model_name", type=str, default="llama3")
+    parser.add_argument("--attacker", type=str, default="DeepInception")
     parser.add_argument("--defense_off", action="store_false", dest="is_defense", help="Disable defense")
     parser.set_defaults(is_defense=True)
     parser.add_argument("--eval_mode_off", action="store_false", dest="eval_mode", help="Disable evaluation mode (Default: True)")
@@ -41,9 +41,9 @@ def get_args():
 
     # System Settings
     parser.add_argument("--device", type=str, default="0")
-    parser.add_argument("--verbose", type=bool, default=False)
+    parser.add_argument("--verbose", type=bool, default=True)
     parser.add_argument("--verbose_on", action="store_true", dest="verbose", help="Enable verbose")
-    parser.add_argument("--FP16", type=bool, default=True)
+    parser.add_argument("--BF16", type=bool, default=True)
     parser.add_argument("--low_cpu_mem_usage", type=bool, default=True)
     parser.add_argument("--use_cache", type=bool, default=False)
     parser.add_argument("--seed", type=int, default=0)
@@ -72,43 +72,34 @@ torch.manual_seed(args.seed)
 # If you are using CUDA (i.e., a GPU), also set the seed for it
 torch.cuda.manual_seed_all(args.seed)
 
-
 # Load model and template
-if args.model_name == "vicuna":
-    model_name = "lmsys/vicuna-7b-v1.5"
-    template_name = 'vicuna'
-elif args.model_name == "llama2":
-    model_name = "meta-llama/Llama-2-7b-chat-hf"
-    template_name = 'llama-2'
-elif args.model_name == "dolphin":
-    model_name = "cognitivecomputations/dolphin-llama2-7b" # From HF
-    template_name = 'vicuna'
-elif args.model_name == "falcon":
-    model_name = "tiiuae/falcon-7b-instruct" # From HF
-    template_name = 'falcon'
-elif args.model_name == "guanaco":
-    model_name = "timdettmers/guanaco-13b-merged" # From HF
-    template_name = 'guanaco'
+# Currently for this branch, we only support llama3.
+if args.model_name == "llama3":
+    model_name = "meta-llama/Meta-Llama-3-8B-Instruct"
+    expert_model_name = "meta-llama/Meta-Llama-3-8B-Instruct" # If you want to test transferable defenses, please change this to other models.
+    expert_lora_path = "../lora_modules/llama3"
+    template_name = 'llama-3'
 else:
-    raise ValueError("Invalid model name.")
+    raise ValueError("Invalid model name. If you want to use other models, please use the main branch.")
 
 conv_template = load_conversation_template(template_name)
-if args.model_name == "dolphin":
-    conv_template.system_message = "You are an autoregressive language model that has been fine-tuned with instruction-tuning and RLHF. You carefully provide accurate, factual, thoughtful, nuanced answers, and are brilliant at reasoning. If you think there might not be a correct answer, you say so. Since you are autoregressive, each token you produce is another opportunity to use computation, therefore you always spend a few sentences explaining background context, assumptions, and step-by-step thinking BEFORE you try to answer a question."
-# Since we upgraded the FastChat, we need to manually add llama-2 system template back to make it consistent with the previous version.
-elif args.model_name == "llama2":
-    conv_template.system_message = "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe. Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature."
 
 device = f'cuda:{args.device}'
+# Make sure both model uses the same tokenizer
 model, tokenizer = load_model_and_tokenizer(model_name, 
-                       FP16=args.FP16,
-                       low_cpu_mem_usage=args.low_cpu_mem_usage,
-                       use_cache=args.use_cache,
-                       do_sample=False,
-                       device=device)
+                    BF16=args.BF16,
+                    low_cpu_mem_usage=args.low_cpu_mem_usage,
+                    use_cache=args.use_cache,
+                    do_sample=False,
+                    device=device)
+expert_model, _ = load_model_and_tokenizer(expert_model_name, 
+                    BF16=args.BF16,
+                    low_cpu_mem_usage=args.low_cpu_mem_usage,
+                    use_cache=args.use_cache,
+                    do_sample=False,
+                    device=device)
+expert_model = PeftModel.from_pretrained(expert_model, expert_lora_path, adapter_name="expert")
 
-model = PeftModel.from_pretrained(model, "../lora_modules/"+args.model_name, adapter_name="expert")
-adapter_names = ['base', 'expert']
 
 
 # Initialize defenders
@@ -133,17 +124,7 @@ if args.attacker == "AdvBench":
     with open('../datasets/harmful_behaviors_custom.json', 'r', encoding='utf-8') as file:
         attack_prompts = json.load(file)
 elif args.attacker in ["GCG", "AutoDAN", "PAIR"]:
-    attack_prompts = load_dataset('flydust/SafeDecoding-Attackers', split="train")
-    attack_prompts = attack_prompts.filter(lambda x: x['source'] == args.attacker)
-    if args.model_name in ["vicuna", "llama2", "guanaco"]:
-        attack_prompts = attack_prompts.filter(lambda x: x['target-model'] == args.model_name)
-    elif args.model_name == "dolphin": # Transfer attack prompts
-        attack_prompts = attack_prompts.filter(lambda x: x['target-model'] == "llama2")
-    elif args.model_name == "falcon":
-        if args.attacker == "GCG":
-            attack_prompts = attack_prompts.filter(lambda x: x['target-model'] == "llama2")
-        else:
-            attack_prompts = attack_prompts.filter(lambda x: x['target-model'] == args.model_name)
+    raise ValueError("GCG, AutoDAN, and PAIR are not supported in this branch for new models. Please generate the attack prompts by your self.")
 elif args.attacker == "DeepInception":
     attack_prompts = load_dataset('flydust/SafeDecoding-Attackers', split="train")
     attack_prompts = attack_prompts.filter(lambda x: x['source'] == args.attacker)
@@ -184,15 +165,15 @@ logging.info(f"Generation Config:\n{model.generation_config}")
 commit_hash, commit_date = get_latest_commit_info()
 logging.info(f"Commit Hash: {commit_hash}, Commit Date: {commit_date}")
 
-# Initialize contrastive decoder
+# Initialize safedecoder
 safe_decoder = SafeDecoding(model, 
-                            tokenizer, 
-                            adapter_names, 
-                            alpha=args.alpha, 
-                            first_m=args.first_m, 
-                            top_k=args.top_k, 
-                            num_common_tokens=args.num_common_tokens,
-                            verbose=args.verbose)
+                expert_model,
+                tokenizer, 
+                alpha=args.alpha, 
+                first_m=args.first_m, 
+                top_k=args.top_k, 
+                num_common_tokens=args.num_common_tokens,
+                verbose=args.verbose)
 
 # Initialize output json
 output_json = {}
@@ -215,7 +196,7 @@ if args.attacker != "Just-Eval":
         "paraphase_model": args.paraphase_model,
         "verbose": args.verbose,
         "device": args.device,
-        "FP16": args.FP16,
+        "BF16": args.BF16,
         "low_cpu_mem_usage": args.low_cpu_mem_usage,
         "use_cache": args.use_cache,
         "do_sample": args.do_sample,

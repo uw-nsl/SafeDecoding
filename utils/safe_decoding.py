@@ -5,10 +5,10 @@ import logging
 from peft import PeftModel, PeftModelForCausalLM
 
 class SafeDecoding:
-    def __init__(self, model, tokenizer, adapter_names, alpha=1, first_m=5, top_k = 10, num_common_tokens = 3, verbose=False):
+    def __init__(self, model, expert_model, tokenizer, alpha=1, first_m=5, top_k = 10, num_common_tokens = 3, verbose=False):
         self.model = model
+        self.expert_model = expert_model
         self.tokenizer = tokenizer
-        self.adapter_names = adapter_names
         self.alpha = alpha
         self.first_m = first_m 
         self.top_k = top_k
@@ -38,22 +38,24 @@ class SafeDecoding:
         step = 1  # Keep track of generation steps
         while step <= min(max_token_len, self.first_m):  # Loop until we reach the first m tokens
             # Generate the next token
-            # duplicate inputs for two original and expert model
-            inputs_duplicated = {k:v.repeat(2,1) for k,v in inputs.items()}
 
-            outputs = self.model.generate(**inputs_duplicated,
-                                    adapter_names=self.adapter_names,
+            output_base = self.model.generate(**inputs,
+                                    generation_config=gen_config,
+                                    pad_token_id=self.tokenizer.pad_token_id,
+                                    return_dict_in_generate=True,
+                                    output_scores=True,)
+
+            output_expert = self.expert_model.generate(**inputs,
+                                    adapter_names=["expert"],
                                     generation_config=gen_config,
                                     pad_token_id=self.tokenizer.pad_token_id,
                                     return_dict_in_generate=True,
                                     output_scores=True,)
             
-            output_base = copy.deepcopy(outputs)
-            output_expert = copy.deepcopy(outputs)
             output_base.sequences = output_base.sequences[0].unsqueeze(0)
             output_base.scores = output_base.scores[0][0].unsqueeze(0)
-            output_expert.sequences = output_expert.sequences[1].unsqueeze(0)
-            output_expert.scores = output_expert.scores[0][1].unsqueeze(0)
+            output_expert.sequences = output_expert.sequences[0].unsqueeze(0)
+            output_expert.scores = output_expert.scores[0][0].unsqueeze(0)
 
             # Process the scores to get the top tokens
             k = self.top_k  # Change this to display more or less tokens
@@ -195,7 +197,6 @@ class SafeDecoding:
             gen_config.max_new_tokens = remaining_steps
             gen_config.do_sample = do_sample
             output_base = self.model.generate(**inputs,
-                                    adapter_names=["base"],
                                     generation_config=gen_config,
                                     pad_token_id=self.tokenizer.pad_token_id,
                                     return_dict_in_generate=True,
@@ -209,7 +210,7 @@ class SafeDecoding:
         return self.tokenizer.decode(generated_sequence), len(generated_sequence)
     
     
-    def generate_baseline(self, inputs, adapter_name = ["base"], gen_config=None):
+    def generate_baseline(self, inputs, gen_config=None):
         if gen_config is None:
             gen_config = self.model.generation_config
         
@@ -219,7 +220,6 @@ class SafeDecoding:
         inputs = {k:v.cuda(self.model.device) for k,v in inputs.items()}
 
         output_base = self.model.generate(**inputs,
-                            adapter_names=adapter_name,
                             generation_config=gen_config,
                             pad_token_id=self.tokenizer.pad_token_id,
                             return_dict_in_generate=True,
