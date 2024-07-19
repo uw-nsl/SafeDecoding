@@ -192,26 +192,31 @@ for user_prompt in tqdm(attack_prompts):
                 full_prompt = tokenizer.decode(input_ids)
                 logging.info(f"Full Prompt: {full_prompt}")
                 user_prompt = full_prompt[full_prompt.find("USER:"):] if "USER:" in full_prompt else full_prompt
-                ft_datasets.append({'text': user_prompt + " " + valid_completion})
-                logging.info(f"Saved: {user_prompt} {valid_completion}")
+                saved_prompt = user_prompt + " " + valid_completion
+                ft_datasets.append({'text': saved_prompt})
+                logging.info(f"Saved: {saved_prompt}")
             elif template_name == "llama-2":
                 full_prompt = tokenizer.decode(input_ids)
                 logging.info(f"Full Prompt: {full_prompt}")
                 user_prompt = full_prompt[full_prompt.find("<</SYS>>") + len("<</SYS>>") + 2:] if "<</SYS>>" in full_prompt else full_prompt
-                ft_datasets.append({'text': user_prompt + " " + valid_completion})
-                logging.info(f"Saved: {user_prompt} {valid_completion}")
+                user_prompt = "[INST] " + user_prompt
+                saved_prompt = user_prompt + " " + valid_completion
+                ft_datasets.append({'text': saved_prompt})
+                logging.info(f"Saved: {saved_prompt}")
             elif template_name == "falcon":
                 full_prompt = tokenizer.decode(input_ids)
                 logging.info(f"Full Prompt: {full_prompt}")
                 user_prompt = full_prompt[full_prompt.find("User:"):] if "User:" in full_prompt else full_prompt
-                ft_datasets.append({'text': user_prompt + " " + valid_completion})
-                logging.info(f"Saved: {user_prompt} {valid_completion}")
+                saved_prompt = user_prompt + " " + valid_completion
+                ft_datasets.append({'text': saved_prompt})
+                logging.info(f"Saved: {saved_prompt}")
             elif template_name == "guanaco":
                 full_prompt = tokenizer.decode(input_ids)
                 logging.info(f"Full Prompt: {full_prompt}")
                 user_prompt = full_prompt[full_prompt.find("### Human:"):] if "### Human:" in full_prompt else full_prompt
-                ft_datasets.append({'text': user_prompt + " " + valid_completion})
-                logging.info(f"Saved: {user_prompt} {valid_completion}")
+                saved_prompt = user_prompt + " " + valid_completion
+                ft_datasets.append({'text': saved_prompt})
+                logging.info(f"Saved: {saved_prompt}")
             else:
                 raise ValueError("Invalid template name.")
 
