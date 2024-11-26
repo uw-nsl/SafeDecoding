@@ -121,7 +121,8 @@ model, tokenizer = load_model_and_tokenizer(model_name,
                        low_cpu_mem_usage=args.low_cpu_mem_usage,
                        use_cache=args.use_cache,
                        do_sample=False,
-                       device=device)
+                       device=device,
+                       device_map="auto")
 
 conv_template = load_conversation_template(template_name)
 if model_name == "cognitivecomputations/dolphin-llama2-7b":
